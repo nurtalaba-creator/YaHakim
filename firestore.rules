@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'rzgartmi@gmail.com'
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidDoctor(data) {
+      return data.keys().hasAll(['name_en', 'name_ku', 'specialty_en', 'specialty_ku', 'location_en', 'location_ku', 'experience', 'contact', 'availableToday', 'bio_en', 'bio_ku']) &&
+             data.name_en is string && data.name_en.size() <= 200 &&
+             data.name_ku is string && data.name_ku.size() <= 200 &&
+             data.specialty_en is string && data.specialty_en.size() <= 100 &&
+             data.specialty_ku is string && data.specialty_ku.size() <= 100 &&
+             data.location_en is string && data.location_en.size() <= 100 &&
+             data.location_ku is string && data.location_ku.size() <= 100 &&
+             data.experience is number && data.experience >= 0 && data.experience <= 100 &&
+             data.contact is string && data.contact.size() <= 50 &&
+             data.availableToday is bool &&
+             data.bio_en is string && data.bio_en.size() <= 5000 &&
+             data.bio_ku is string && data.bio_ku.size() <= 5000;
+    }
+
+    function isValidArticle(data) {
+      return data.keys().hasAll(['title_en', 'title_ku', 'content_en', 'content_ku', 'category_en', 'category_ku', 'author', 'publishedAt', 'audience_en', 'audience_ku', 'symptoms_en', 'symptoms_ku', 'imageUrl']) &&
+             data.title_en is string && data.title_en.size() <= 300 &&
+             data.title_ku is string && data.title_ku.size() <= 300 &&
+             data.content_en is string && data.content_en.size() <= 20000 &&
+             data.content_ku is string && data.content_ku.size() <= 20000 &&
+             data.category_en is string && data.category_en.size() <= 100 &&
+             data.category_ku is string && data.category_ku.size() <= 100 &&
+             data.author is string && data.author.size() <= 200 &&
+             data.publishedAt is string && data.publishedAt.size() <= 30 &&
+             data.symptoms_en is list && data.symptoms_en.size() <= 20 &&
+             (data.symptoms_en.size() == 0 || data.symptoms_en[0] is string) &&
+             data.symptoms_ku is list && data.symptoms_ku.size() <= 20 &&
+             (data.symptoms_ku.size() == 0 || data.symptoms_ku[0] is string);
+    }
+
+    // --- Collection Rules ---
+
+    match /doctors/{doctorId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(doctorId) && isValidDoctor(incoming());
+      allow update: if isAdmin() && isValidId(doctorId) && isValidDoctor(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /articles/{articleId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(articleId) && isValidArticle(incoming());
+      allow update: if isAdmin() && isValidId(articleId) && isValidArticle(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      // Only an existing admin can create another admin
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Administrator profile",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["superadmin", "editor"] }
+      },
+      "required": ["email", "role"]
+    },
+    "Doctor": {
+      "title": "Doctor",
+      "description": "Healthcare provider profile",
+      "type": "object",
+      "properties": {
+        "name_en": { "type": "string" },
+        "name_ku": { "type": "string" },
+        "specialty_en": { "type": "string" },
+        "specialty_ku": { "type": "string" },
+        "certification_en": { "type": "string" },
+        "certification_ku": { "type": "string" },
+        "clinic_en": { "type": "string" },
+        "clinic_ku": { "type": "string" },
+        "workdays_en": { "type": "string" },
+        "workdays_ku": { "type": "string" },
+        "fee": { "type": "string" },
+        "location_en": { "type": "string" },
+        "location_ku": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "address_en": { "type": "string" },
+        "address_ku": { "type": "string" },
+        "sourceLink": { "type": "string" },
+        "experience": { "type": "number" },
+        "contact": { "type": "string" },
+        "bio_en": { "type": "string" },
+        "bio_ku": { "type": "string" },
+        "availableToday": { "type": "boolean" }
+      },
+      "required": ["name_en", "name_ku", "specialty_en", "specialty_ku", "location_en", "location_ku", "experience", "contact", "availableToday"]
+    },
+    "Article": {
+      "title": "Article",
+      "description": "Health article for the magazine",
+      "type": "object",
+      "properties": {
+        "title_en": { "type": "string" },
+        "title_ku": { "type": "string" },
+        "content_en": { "type": "string" },
+        "content_ku": { "type": "string" },
+        "category_en": { "type": "string" },
+        "category_ku": { "type": "string" },
+        "audience_en": { "type": "string" },
+        "audience_ku": { "type": "string" },
+        "symptoms_en": { "type": "array", "items": { "type": "string" } },
+        "symptoms_ku": { "type": "array", "items": { "type": "string" } },
+        "author": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "publishedAt": { "type": "string" }
+      },
+      "required": ["title_en", "title_ku", "content_en", "content_ku", "category_en", "category_ku", "author", "publishedAt"]
+    }
+  },
+  "firestore": {
+    "doctors/{doctorId}": {
+      "schema": "Doctor",
+      "description": "Collection of doctor profiles"
+    },
+    "articles/{articleId}": {
+      "schema": "Article",
+      "description": "Collection of magazine articles"
+    },
+    "admins/{adminId}": {
+      "schema": "Admin",
+      "description": "System administrators"
+    }
+  }
+}

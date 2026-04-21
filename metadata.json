@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Ya Hakeem",
+  "description": "A comprehensive doctors directory and health magazine with bilingual support (English \u0026 Kurdish Sorani).",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}
