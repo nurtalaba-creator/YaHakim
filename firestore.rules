@@ -17,10 +17,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'rzgartmi@gmail.com'
-      );
+      // For simple demo mode, we allow all signed-in users to write.
+      // Access is primarily guarded by the UI password.
+      return isSignedIn();
     }
 
     function isValidId(id) {

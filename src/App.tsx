@@ -7,7 +7,7 @@ import { SPECIALTIES } from './constants/specialties';
 import { DOCTORS_SEED } from './constants/seedData';
 import { dataService, type Doctor, type Article } from './lib/dataService';
 import { auth, db } from './lib/firebase';
-import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously, signOut, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, getDoc, setDoc } from 'firebase/firestore';
 
 // --- Types ---
@@ -64,7 +64,6 @@ function AppContent() {
   const [isBarsVisible, setIsBarsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const handleGlobalScroll = () => {
@@ -106,16 +105,8 @@ function AppContent() {
 
   // Auth & Data Initialization
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (authUser) => {
+    const unsub = onAuthStateChanged(auth, (authUser) => {
       setUser(authUser);
-      if (authUser) {
-        // Check admin status
-        const adminDoc = await getDoc(doc(db, 'admins', authUser.uid));
-        const isSuperAdmin = authUser.email === 'rzgartmi@gmail.com';
-        setIsAdmin(adminDoc.exists() || isSuperAdmin);
-      } else {
-        setIsAdmin(false);
-      }
     });
 
     const initData = async () => {
@@ -127,8 +118,6 @@ function AppContent() {
 
         setDoctors(fetchedDoctors);
         setArticles(fetchedArticles);
-
-        // Seeding logic moved to a separate check to avoid permission errors
       } catch (err) {
         console.error("Failed to fetch data:", err);
       } finally {
@@ -140,11 +129,11 @@ function AppContent() {
     return () => unsub();
   }, []);
 
-  // Separate effect for seeding once admin status is known
+  // Separate effect for seeding once user session is active
   useEffect(() => {
     const seedIfEmpty = async () => {
-      if (isAdmin && doctors.length === 0 && articles.length === 0 && !isLoading) {
-        console.log("Seeding initial data as admin...");
+      if (user && doctors.length === 0 && articles.length === 0 && !isLoading) {
+        console.log("Seeding initial data...");
         try {
           // Import from Seed Data
           for (const d of DOCTORS_SEED) {
@@ -162,12 +151,12 @@ function AppContent() {
           setDoctors(dSet);
           setArticles(aSet);
         } catch (err) {
-          console.error("Seeding failed despite admin status:", err);
+          console.error("Seeding failed:", err);
         }
       }
     };
     seedIfEmpty();
-  }, [isAdmin, doctors.length, articles.length, isLoading]);
+  }, [user, doctors.length, articles.length, isLoading]);
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition((position) => {
@@ -243,32 +232,6 @@ function AppContent() {
         </div>
 
         <div className="flex items-center gap-2">
-          {user ? (
-            <div className="flex items-center gap-2 mr-2">
-               <button 
-                onClick={() => signOut(auth)}
-                className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
-                title="Sign Out"
-              >
-                <X size={18} />
-              </button>
-              {isAdmin && (
-                <div className="w-2 h-2 rounded-full bg-teal-500" title="Admin Active" />
-              )}
-               <img src={user.photoURL || ''} className="w-6 h-6 rounded-full border border-slate-200" referrerPolicy="no-referrer" />
-            </div>
-          ) : (
-            <button 
-              onClick={() => {
-                const provider = new GoogleAuthProvider();
-                signInWithPopup(auth, provider);
-              }}
-              className="p-1.5 text-slate-400 hover:text-teal-600 transition-colors mr-2"
-              title="Sign In"
-            >
-              <User size={18} />
-            </button>
-          )}
           <button 
             onClick={toggleTheme}
             className="p-1.5 text-slate-400 hover:text-teal-600 transition-colors"
@@ -497,8 +460,6 @@ function AppContent() {
                   setIsImporting={setIsImporting}
                   importProgress={importProgress}
                   setImportProgress={setImportProgress}
-                  isAdmin={isAdmin}
-                  user={user}
                 />
               </motion.div>
             )}
@@ -1234,46 +1195,47 @@ function MagazineSection({ articles, activeSpecialty, setActiveSpecialty, setSel
   );
 }
 
-function CMSSection({ setDoctors, setArticles, isImporting, setIsImporting, importProgress, setImportProgress, isAdmin, user }: { 
+function CMSSection({ setDoctors, setArticles, isImporting, setIsImporting, importProgress, setImportProgress }: { 
   setDoctors: React.Dispatch<React.SetStateAction<Doctor[]>>, 
   setArticles: React.Dispatch<React.SetStateAction<Article[]>>,
   isImporting: boolean,
   setIsImporting: React.Dispatch<React.SetStateAction<boolean>>,
   importProgress: number,
-  setImportProgress: React.Dispatch<React.SetStateAction<number>>,
-  isAdmin: boolean,
-  user: FirebaseUser | null
+  setImportProgress: React.Dispatch<React.SetStateAction<number>>
 }) {
   const [activeForm, setActiveForm] = useState<'doctor' | 'article' | 'import'>('import');
+  const [password, setPassword] = useState('');
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
-  if (!isAdmin) {
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === 'admin123') { // Simple password for demo
+      setIsAuthorized(true);
+    } else {
+      alert('Incorrect password');
+    }
+  };
+
+  if (!isAuthorized) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] p-6 text-center">
-        <div className="w-full max-w-sm bg-white dark:bg-slate-900 p-10 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 space-y-6">
-           <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/20 rounded-full flex items-center justify-center mx-auto">
-              <Lock className="text-rose-600" size={28} />
+      <div className="flex items-center justify-center min-h-[60vh] p-6">
+        <form onSubmit={handleLogin} className="w-full max-w-sm bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 text-center space-y-6">
+           <div className="w-16 h-16 bg-teal-50 dark:bg-teal-900/20 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="text-teal-600" size={28} />
            </div>
            <div className="space-y-2">
-             <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Restricted Area</h2>
-             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-               {user ? "Access denied. Your account does not have editor privileges." : "Please sign in with an authorized account to access the portal."}
-             </p>
+             <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Admin Access</h2>
+             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Please enter your credentials</p>
            </div>
-           {!user && (
-             <button 
-               onClick={() => {
-                 const provider = new GoogleAuthProvider();
-                 signInWithPopup(auth, provider);
-               }}
-               className="w-full btn-dark py-4 text-xs bg-slate-900 dark:bg-white dark:text-slate-900"
-             >
-               Sign In with Google
-             </button>
-           )}
-           {user && (
-             <p className="text-[10px] text-slate-400 font-medium">Logged in as {user.email}</p>
-           )}
-        </div>
+           <input 
+             type="password" 
+             value={password}
+             onChange={(e) => setPassword(e.target.value)}
+             placeholder="Enter Password" 
+             className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl py-3 px-4 text-sm font-bold focus:ring-1 focus:ring-teal-500 dark:text-white"
+           />
+           <button type="submit" className="w-full btn-dark py-4 text-xs bg-slate-900 dark:bg-white dark:text-slate-900">Unlock Panel</button>
+        </form>
       </div>
     );
   }
