@@ -49,7 +49,7 @@ function AppContent() {
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
-  const [userCity, setUserCity] = useState<string>('Rania');
+  const [userCity, setUserCity] = useState<string>('All');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -64,6 +64,39 @@ function AppContent() {
   const [isBarsVisible, setIsBarsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [user, setUser] = useState<FirebaseUser | null>(null);
+
+  const groupedDoctors = useMemo(() => {
+    const map = new Map<string, any>();
+    doctors.forEach(doc => {
+      const key = `${doc.name_ku.trim()}-${doc.specialty_ku.trim()}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          ...doc,
+          clinics: [{
+            name_en: doc.clinic_en || 'Private Clinic',
+            name_ku: doc.clinic_ku || 'کلینیکی تایبەت',
+            address_en: doc.address_en || '',
+            address_ku: doc.address_ku || '',
+            phone: doc.phoneNumber || doc.contact
+          }]
+        });
+      } else {
+        const existing = map.get(key);
+        existing.clinics.push({
+          name_en: doc.clinic_en || 'Private Clinic',
+          name_ku: doc.clinic_ku || 'کلینیکی تایبەت',
+          address_en: doc.address_en || '',
+          address_ku: doc.address_ku || '',
+          phone: doc.phoneNumber || doc.contact
+        });
+        // Combined phone for the summary card if multiple exist
+        if (doc.phoneNumber && !existing.phoneNumber?.includes(doc.phoneNumber)) {
+          existing.phoneNumber = existing.phoneNumber ? `${existing.phoneNumber}, ${doc.phoneNumber}` : doc.phoneNumber;
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [doctors]);
 
   useEffect(() => {
     const handleGlobalScroll = () => {
@@ -184,6 +217,29 @@ function AppContent() {
     return all.filter(s => s && s.trim() !== '' && s !== 'General').sort((a, b) => a.localeCompare(b));
   }, [language, doctors, articles]);
 
+  const availableCities = useMemo(() => {
+    const rawCities = doctors.map(d => d.location_en);
+    const unique = Array.from(new Set(rawCities.filter(c => c && c.trim() !== ''))) as string[];
+    return unique.sort((a, b) => a.localeCompare(b));
+  }, [doctors]);
+
+  const sidebarCounts = useMemo(() => {
+    const todayCount = doctors.filter(d => d.availableToday).length;
+    const allCount = doctors.length;
+    
+    const specialtyMap: Record<string, number> = {};
+    doctors.forEach(d => {
+      const spec = language === 'en' ? d.specialty_en : d.specialty_ku;
+      specialtyMap[spec] = (specialtyMap[spec] || 0) + 1;
+    });
+    
+    return {
+      all: allCount,
+      today: todayCount,
+      specialties: specialtyMap
+    };
+  }, [doctors, language]);
+
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -224,11 +280,32 @@ function AppContent() {
             onClick={() => {
               setActiveTab('directory');
               setMagazineSpecialty(null);
+              setSelectedSpecialty(null); // Fix: All Doctors should show all doctors, not just today
+              setSearchQuery('');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="text-lg font-black tracking-tighter text-slate-900 dark:text-white"
+            className="text-lg font-black tracking-tighter text-slate-900 dark:text-white mr-4"
           >
             {language === 'en' ? 'YA HAKEEM' : 'یا حەکیم'}
           </button>
+
+          {/* Desktop Nav Tabs */}
+          <div className="hidden md:flex items-center gap-1 bg-slate-50 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
+            <button 
+              onClick={() => setActiveTab('directory')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'directory' ? 'bg-white dark:bg-slate-800 text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Stethoscope size={14} />
+              {t('directory')}
+            </button>
+            <button 
+              onClick={() => setActiveTab('magazine')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'magazine' ? 'bg-white dark:bg-slate-800 text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <BookOpen size={14} />
+              {language === 'en' ? 'Magazine' : t('magazine')}
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -291,9 +368,14 @@ function AppContent() {
                     }}
                     className={`w-full px-4 py-3 rounded-xl text-sm font-bold transition-all ${isRtl ? 'text-right' : 'text-left'} ${(activeTab === 'directory' ? !selectedSpecialty && !searchQuery : !magazineSpecialty && !searchQuery) ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                   >
-                    <div className={`flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                       <Home size={16} />
-                       {activeTab === 'directory' ? t('allSpecialties') : t('allTopics')}
+                    <div className={`flex items-center justify-between gap-2`}>
+                       <div className={`flex items-center gap-2 ${isRtl ? 'order-last flex-row-reverse' : ''}`}>
+                         <Home size={16} />
+                         {activeTab === 'directory' ? t('allSpecialties') : t('allTopics')}
+                       </div>
+                       {activeTab === 'directory' && (
+                         <span className={`text-[10px] font-black opacity-40 ${isRtl ? 'order-first' : ''}`}>{sidebarCounts.all}</span>
+                       )}
                     </div>
                   </button>
                   {activeTab === 'directory' && (
@@ -304,9 +386,12 @@ function AppContent() {
                       }}
                       className={`w-full px-4 py-3 rounded-xl text-sm font-bold transition-all ${isRtl ? 'text-right' : 'text-left'} ${selectedSpecialty === 'Today' ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                     >
-                      <div className={`flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                         <Calendar size={16} />
-                         {t('todaysDoctors')}
+                      <div className={`flex items-center justify-between gap-2`}>
+                         <div className={`flex items-center gap-2 ${isRtl ? 'order-last flex-row-reverse' : ''}`}>
+                           <Calendar size={16} />
+                           {t('todaysDoctors')}
+                         </div>
+                         <span className={`text-[10px] font-black opacity-40 ${isRtl ? 'order-first' : ''}`}>{sidebarCounts.today}</span>
                       </div>
                     </button>
                   )}
@@ -334,7 +419,12 @@ function AppContent() {
                       }}
                       className={`w-full px-4 py-3 rounded-xl text-sm font-bold transition-all ${isRtl ? 'text-right' : 'text-left'} ${(activeTab === 'directory' ? selectedSpecialty === s : magazineSpecialty === s) ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                     >
-                      {s}
+                      <div className={`flex items-center justify-between gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                        <span className="truncate">{s}</span>
+                        {activeTab === 'directory' && sidebarCounts.specialties[s] && (
+                          <span className="text-[10px] font-black opacity-40">{sidebarCounts.specialties[s]}</span>
+                        )}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -354,30 +444,38 @@ function AppContent() {
                   else setMagazineSpecialty(null);
                   setSearchQuery('');
                 }}
-                className={`w-full text-start px-3 py-2 rounded-lg text-xs font-bold transition-all ${(activeTab === 'directory' ? !selectedSpecialty && !searchQuery : !magazineSpecialty && !searchQuery) ? 'bg-white dark:bg-slate-800 text-teal-600 shadow-sm border border-slate-100 dark:border-slate-800' : 'text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800'}`}
+                className={`w-full px-3 py-2 rounded-lg text-xs font-bold transition-all ${isRtl ? 'text-right' : 'text-left'} ${(activeTab === 'directory' ? !selectedSpecialty && !searchQuery : !magazineSpecialty && !searchQuery) ? 'bg-white dark:bg-slate-800 text-teal-600 shadow-sm border border-slate-100 dark:border-slate-800' : 'text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800'}`}
               >
-                <div className="flex items-center gap-2">
-                   <Home size={14} />
-                   {activeTab === 'directory' ? t('allSpecialties') : t('allTopics')}
+                <div className={`flex items-center justify-between gap-2`}>
+                   <div className={`flex items-center gap-2 ${isRtl ? 'order-last flex-row-reverse' : ''}`}>
+                     <Home size={14} />
+                     {activeTab === 'directory' ? t('allSpecialties') : t('allTopics')}
+                   </div>
+                   {activeTab === 'directory' && (
+                     <span className={`text-[10px] font-black opacity-30 ${isRtl ? 'order-first' : ''}`}>{sidebarCounts.all}</span>
+                   )}
                 </div>
               </button>
               {activeTab === 'directory' && (
                 <button 
                   onClick={() => setSelectedSpecialty('Today')}
-                  className={`w-full text-start px-3 py-2 rounded-lg text-xs font-bold transition-all ${selectedSpecialty === 'Today' ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 shadow-sm border border-rose-100 dark:border-rose-900/50' : 'text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800'}`}
+                  className={`w-full px-3 py-2 rounded-lg text-xs font-bold transition-all ${isRtl ? 'text-right' : 'text-left'} ${selectedSpecialty === 'Today' ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 shadow-sm border border-rose-100 dark:border-rose-900/50' : 'text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800'}`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Calendar size={14} />
-                    {t('todaysDoctors')}
+                  <div className={`flex items-center justify-between gap-2`}>
+                    <div className={`flex items-center gap-2 ${isRtl ? 'order-last flex-row-reverse' : ''}`}>
+                      <Calendar size={14} />
+                      {t('todaysDoctors')}
+                    </div>
+                    <span className={`text-[10px] font-black opacity-30 ${isRtl ? 'order-first' : ''}`}>{sidebarCounts.today}</span>
                   </div>
                 </button>
               )}
               {activeTab === 'magazine' && (
                 <button 
                   onClick={() => setMagazineSpecialty('Latest')}
-                  className={`w-full text-start px-3 py-2 rounded-lg text-xs font-bold transition-all ${magazineSpecialty === 'Latest' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 shadow-sm border border-orange-100 dark:border-orange-900/50' : 'text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800'}`}
+                  className={`w-full px-3 py-2 rounded-lg text-xs font-bold transition-all ${magazineSpecialty === 'Latest' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 shadow-sm border border-orange-100 dark:border-orange-900/50' : 'text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800'}`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-2 ${isRtl ? 'flex-row-reverse text-right' : ''}`}>
                     <Bell size={14} />
                     {t('latestArticles')}
                   </div>
@@ -391,9 +489,14 @@ function AppContent() {
                     if (activeTab === 'directory') setSelectedSpecialty(s);
                     else setMagazineSpecialty(s);
                   }}
-                  className={`w-full px-3 py-2 rounded-lg text-xs font-bold transition-all ${isRtl ? 'text-right' : 'text-left'} ${(activeTab === 'directory' ? selectedSpecialty === s : magazineSpecialty === s) ? 'bg-white dark:bg-slate-800 text-teal-600 shadow-sm border border-slate-100 dark:border-slate-800' : 'text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800'}`}
+                  className={`w-full px-3 py-2 rounded-lg text-xs font-bold transition-all ${(activeTab === 'directory' ? selectedSpecialty === s : magazineSpecialty === s) ? 'bg-white dark:bg-slate-800 text-teal-600 shadow-sm border border-slate-100 dark:border-slate-800' : 'text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800'}`}
                 >
-                  {s}
+                  <div className={`flex items-center justify-between gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                    <span className="truncate">{s}</span>
+                    {activeTab === 'directory' && sidebarCounts.specialties[s] && (
+                      <span className="text-[10px] font-black opacity-30">{sidebarCounts.specialties[s]}</span>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
@@ -416,7 +519,7 @@ function AppContent() {
                 className="max-w-5xl mx-auto"
               >
                 <DirectorySection 
-                  doctors={doctors}
+                  doctors={groupedDoctors}
                   setSelectedDoctor={setSelectedDoctor} 
                   userCity={userCity} 
                   setUserCity={setUserCity}
@@ -508,19 +611,21 @@ function AppContent() {
           )}
         </AnimatePresence>
 
-        {/* Doctor Details - More Compact */}
+        {/* Doctor Details - Side Panel on Desktop, Bottom Sheet on Mobile */}
         <AnimatePresence>
           {selectedDoctor && (
             <>
               <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => setSelectedDoctor(null)}
-                className="absolute inset-0 bg-slate-900/5 dark:bg-slate-900/20 backdrop-blur-[2px] z-[70]"
+                className="fixed inset-0 bg-slate-900/10 dark:bg-slate-900/40 backdrop-blur-[2px] z-[110]"
               />
               <motion.div
-                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 20, stiffness: 100 }}
-                className="absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 shadow-2xl z-[80] flex flex-col max-h-[90vh] transition-colors"
+                initial={window.innerWidth >= 768 ? { x: '-100%' } : { y: '100%' }}
+                animate={window.innerWidth >= 768 ? { x: 0 } : { y: 0 }}
+                exit={window.innerWidth >= 768 ? { x: '-100%' } : { y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed bottom-0 left-0 right-0 md:top-0 md:right-auto md:w-[480px] bg-white dark:bg-slate-900 border-t md:border-t-0 md:border-r border-slate-100 dark:border-slate-800 shadow-2xl z-[120] flex flex-col max-h-[90vh] md:max-h-none h-auto md:h-full transition-colors"
               >
                 <div className="p-6 overflow-y-auto">
                   <div className="flex gap-6 flex-col sm:flex-row">
@@ -532,18 +637,37 @@ function AppContent() {
                         </div>
                         <button onClick={() => setSelectedDoctor(null)} className="p-1 text-slate-300 hover:text-slate-900 dark:hover:text-white"><X size={18} /></button>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        {selectedDoctor.clinics && selectedDoctor.clinics.map((clinic: any, idx: number) => (
+                          <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2">
+                            <div className="flex items-center gap-2 text-teal-600">
+                               <Home size={14} />
+                               <span className="text-sm font-black uppercase tracking-tight">{language === 'en' ? clinic.name_en : clinic.name_ku}</span>
+                            </div>
+                            {clinic.address_en && (
+                              <div className="flex items-start gap-2">
+                                <MapPin size={12} className="text-slate-400 mt-0.5 shrink-0" />
+                                <p className="text-[11px] font-bold text-slate-600 dark:text-slate-400">{language === 'en' ? clinic.address_en : clinic.address_ku}</p>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                               <Search size={12} className="text-slate-400" />
+                               <p className="text-xs font-black text-teal-600">{clinic.phone}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 mt-4">
                         <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-50 dark:border-slate-700">
-                          <label className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">{t('location')}</label>
-                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{language === 'en' ? selectedDoctor.location_en : selectedDoctor.location_ku}</p>
+                          <label className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Certification</label>
+                          <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                            {language === 'en' ? selectedDoctor.certification_en : selectedDoctor.certification_ku}
+                          </p>
                         </div>
                         <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-50 dark:border-slate-700">
                           <label className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">{t('experience')}</label>
                           <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{selectedDoctor.experience}y</p>
-                        </div>
-                        <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-50 dark:border-slate-700">
-                          <label className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Fee</label>
-                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{selectedDoctor.fee || 'N/A'}</p>
                         </div>
                       </div>
                       <div className="mt-4 p-3 bg-teal-50/30 dark:bg-teal-900/10 rounded-lg border border-teal-50 dark:border-teal-900/30">
@@ -602,19 +726,21 @@ function AppContent() {
           )}
         </AnimatePresence>
 
-        {/* Article Details Bottom Sheet */}
+        {/* Article Details - Side Panel on Desktop, Bottom Sheet on Mobile */}
         <AnimatePresence>
           {selectedArticle && (
             <>
               <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => setSelectedArticle(null)}
-                className="absolute inset-0 bg-slate-900/10 dark:bg-slate-900/30 backdrop-blur-[2px] z-[70]"
+                className="fixed inset-0 bg-slate-900/10 dark:bg-slate-900/40 backdrop-blur-[2px] z-[110]"
               />
               <motion.div
-                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 20, stiffness: 100 }}
-                className="absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 shadow-2xl z-[80] flex flex-col h-[60vh] transition-colors"
+                initial={window.innerWidth >= 768 ? { x: '-100%' } : { y: '100%' }}
+                animate={window.innerWidth >= 768 ? { x: 0 } : { y: 0 }}
+                exit={window.innerWidth >= 768 ? { x: '-100%' } : { y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed bottom-0 left-0 right-0 md:top-0 md:right-auto md:w-[600px] bg-white dark:bg-slate-950 border-t md:border-t-0 md:border-r border-slate-100 dark:border-slate-800 shadow-2xl z-[120] flex flex-col h-[80vh] md:h-full transition-colors"
               >
                 <div className="h-14 flex items-center justify-between px-6 shrink-0 border-b border-slate-100 dark:border-slate-800">
                   <span className="text-[10px] font-black uppercase text-teal-600 tracking-widest">{language === 'en' ? selectedArticle.category_en : selectedArticle.category_ku}</span>
@@ -683,8 +809,19 @@ function AppContent() {
                 <h3 className="text-xl font-black text-slate-900 dark:text-white mb-6 text-center uppercase tracking-tight">
                   {t('selectCity')}
                 </h3>
-                <div className="grid grid-cols-2 gap-3 mb-8">
-                  {['Halabja', 'Rania', 'Qalladza', 'Erbil', 'Sulaymaniyah', 'Duhok'].map((city) => (
+                <div className="grid grid-cols-2 gap-3 mb-8 max-h-[50vh] overflow-y-auto p-1">
+                  <button 
+                    onClick={() => {
+                      setUserCity('All');
+                      setIsLocationSheetOpen(false);
+                    }}
+                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${userCity === 'All' ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/40 text-teal-700 dark:text-teal-400' : 'border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                  >
+                    <Globe size={20} className={userCity === 'All' ? 'text-teal-500' : 'text-slate-300'} />
+                    <span className="text-sm font-bold uppercase">{t('allLocations')}</span>
+                  </button>
+
+                  {availableCities.map((city) => (
                     <button 
                       key={city}
                       onClick={() => {
@@ -721,7 +858,7 @@ function AppContent() {
       {/* Tabs Bar - Fixed and Centered */}
       <motion.nav 
         animate={{ y: isBarsVisible ? 0 : 100 }}
-        className="h-16 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex fixed bottom-0 left-0 right-0 z-[100] transition-colors shadow-[0_-4px_12px_rgba(0,0,0,0.05)]"
+        className="h-14 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex md:hidden fixed bottom-0 left-0 right-0 z-[40] transition-colors shadow-[0_-4px_12px_rgba(0,0,0,0.05)]"
       >
         <div className="w-full flex items-stretch">
           <button 
@@ -770,7 +907,11 @@ function DirectorySection({ doctors, setSelectedDoctor, userCity, setUserCity, s
   }, [selectedSpecialty]);
 
   const filteredDoctors = useMemo(() => {
-    let filtered = doctors.filter((d: Doctor) => d.location_en === userCity || d.location_ku === userCity);
+    let filtered = doctors;
+    if (userCity !== 'All') {
+      filtered = filtered.filter((d: Doctor) => d.location_en === userCity || d.location_ku === userCity);
+    }
+    
     if (searchQuery) {
       filtered = filtered.filter((d: Doctor) => 
         d.name_en.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -819,8 +960,7 @@ function DirectorySection({ doctors, setSelectedDoctor, userCity, setUserCity, s
     <div className="p-4 md:p-6 space-y-6">
       {/* Search / City Row */}
       <div className="flex items-center justify-between gap-4 sticky top-14 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm z-20 py-2 -mx-4 px-4 border-b border-slate-100 dark:border-slate-800 md:relative md:top-auto md:bg-transparent md:backdrop-blur-none md:border-none md:px-0 md:mx-0">
-        <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase shrink-0">{t('directory')}</h1>
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar ml-auto">
           {!selectedSpecialty && (
             <button 
               onClick={() => setAllExpanded(!allExpanded)}
@@ -834,7 +974,9 @@ function DirectorySection({ doctors, setSelectedDoctor, userCity, setUserCity, s
             className="flex items-center gap-2 text-[10px] font-bold bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-teal-500 transition-all whitespace-nowrap"
           >
             <MapPin size={12} className="text-teal-600" />
-            <span className="uppercase font-black text-slate-900 dark:text-white">{t(userCity.toLowerCase())}</span>
+            <span className="uppercase font-black text-slate-900 dark:text-white">
+              {userCity === 'All' ? t('allLocations') : t(userCity.toLowerCase())}
+            </span>
           </button>
         </div>
       </div>
@@ -863,8 +1005,8 @@ function DirectorySection({ doctors, setSelectedDoctor, userCity, setUserCity, s
         </motion.div>
       )}
 
-      {/* Today's Doctors section - Only show if specifically on "Today" OR no specialty selected AND searching */}
-      {((selectedSpecialty === 'Today' && !searchQuery) || (!selectedSpecialty && searchQuery && Object.keys(todaysDoctorsBySpecialty).length > 0)) && (
+      {/* Today's Doctors section - Shown if specifically on "Today" OR no specialty selected */}
+      {((selectedSpecialty === 'Today' && !searchQuery) || (!selectedSpecialty && !searchQuery && Object.keys(todaysDoctorsBySpecialty).length > 0)) && (
         <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex flex-col">
@@ -904,18 +1046,17 @@ function DirectorySection({ doctors, setSelectedDoctor, userCity, setUserCity, s
                       <div className="py-2 px-2 grid grid-cols-1 gap-1.5 border-t border-slate-50 dark:border-slate-700/50">
                         {(docs as Doctor[]).map(doc => (
                           <div key={doc.id} onClick={() => setSelectedDoctor(doc)} className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
-                            <div className="flex-1">
-                              <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight mb-1">{language === 'en' ? doc.name_en : doc.name_ku}</h5>
-                              <div className="flex flex-col gap-0.5">
-                                 <span className="text-[9px] font-medium text-slate-500 flex items-center gap-1 uppercase">
-                                   <Home size={10} className="text-teal-600" />
-                                   {language === 'en' ? doc.clinic_en || 'Private Clinic' : doc.clinic_ku || 'کلینیکی تایبەت'}
-                                 </span>
-                                 <span className="text-[10px] font-black text-teal-600 flex items-center gap-1">
-                                   <Search size={10} />
-                                   {doc.contact}
-                                 </span>
-                              </div>
+                            <div className="flex-1 min-w-0">
+                               <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-tight mb-1 truncate">{language === 'en' ? doc.name_en : doc.name_ku}</h5>
+                               <div className="flex flex-col gap-0.5">
+                                  <span className="text-[9px] font-medium text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis uppercase">
+                                    {language === 'en' ? doc.certification_en || 'Medical Specialist' : doc.certification_ku || 'پزیشکی پسپۆڕ'}
+                                  </span>
+                                  <span className="text-[10px] font-black text-teal-600 flex items-center gap-1">
+                                    <Search size={10} />
+                                    {doc.phoneNumber || doc.contact}
+                                  </span>
+                               </div>
                             </div>
                             <ChevronRight size={14} className="text-slate-300 dark:text-slate-600" />
                           </div>
@@ -962,18 +1103,17 @@ function DirectorySection({ doctors, setSelectedDoctor, userCity, setUserCity, s
                           key={doc.id} onClick={() => setSelectedDoctor(doc)}
                           className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 cursor-pointer group hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-teal-100 dark:hover:border-teal-900 hover:shadow-md transition-all shadow-sm"
                         >
-                          <div className="flex-1">
-                            <h5 className="font-bold text-sm text-slate-900 dark:text-white leading-tight mb-2">{language === 'en' ? doc.name_en : doc.name_ku}</h5>
-                            <div className="space-y-1">
-                               <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase">
-                                 <Home size={12} className="text-teal-600 shrink-0" />
-                                 <span className="truncate">{language === 'en' ? doc.clinic_en || 'Private Clinic' : doc.clinic_ku || 'کلینیکی تایبەت'}</span>
-                               </div>
-                               <div className="flex items-center gap-2 text-[11px] font-black text-teal-600">
-                                 <Search size={12} className="shrink-0" />
-                                 {doc.contact}
-                               </div>
-                            </div>
+                          <div className="flex-1 min-w-0">
+                             <h5 className="font-bold text-sm text-slate-900 dark:text-white leading-tight mb-2 truncate">{language === 'en' ? doc.name_en : doc.name_ku}</h5>
+                             <div className="space-y-1">
+                                <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase truncate">
+                                  {language === 'en' ? doc.certification_en || 'Medical Specialist' : doc.certification_ku || 'پزیشکی پسپۆڕ'}
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] font-black text-teal-600">
+                                  <Search size={12} className="shrink-0" />
+                                  {doc.phoneNumber || doc.contact}
+                                </div>
+                             </div>
                           </div>
                           <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center group-hover:bg-teal-500 group-hover:text-white transition-all text-slate-300 dark:text-slate-600">
                             <ChevronRight size={16} />
@@ -1045,7 +1185,6 @@ function MagazineSection({ articles, activeSpecialty, setActiveSpecialty, setSel
 
   return (
     <div className="p-4 md:p-6 space-y-8 text-slate-900 dark:text-slate-100 transition-colors">
-      {/* Search Header */}
       {searchQuery && (
         <div className="flex items-center justify-between bg-teal-50 dark:bg-teal-900/20 p-4 rounded-xl border border-teal-100 dark:border-teal-900/50">
            <div>
@@ -1056,10 +1195,10 @@ function MagazineSection({ articles, activeSpecialty, setActiveSpecialty, setSel
         </div>
       )}
 
-      {!searchQuery && (
+      {activeSpecialty && (
         <div className="flex justify-between items-end">
           <h2 className="text-3xl font-black tracking-tighter uppercase text-slate-900 dark:text-white">
-            {activeSpecialty === 'Latest' ? t('latestArticles') : (activeSpecialty || t('magazineTitle'))}
+            {activeSpecialty === 'Latest' ? t('latestArticles') : activeSpecialty}
           </h2>
         </div>
       )}
@@ -1069,7 +1208,11 @@ function MagazineSection({ articles, activeSpecialty, setActiveSpecialty, setSel
         <div className="space-y-8">
           <div className="py-8 border-b border-slate-100 dark:border-slate-800">
              <h3 className="text-5xl font-black text-slate-900 dark:text-white font-arabic tracking-tighter leading-none">{t('magazineTitle')}</h3>
-             <p className="text-slate-500 mt-4 text-lg font-medium max-w-2xl">Your daily dose of wellness and medical insights, expert medical opinions, and health tips.</p>
+             <p className={`mt-4 text-lg max-w-2xl ${language === 'ku' ? 'text-slate-600 dark:text-slate-400 font-sans' : 'text-slate-500 font-medium'}`}>
+               {language === 'en' 
+                 ? "Your daily dose of wellness and medical insights, expert medical opinions, and health tips."
+                 : "سەرچاوەی ڕۆژانەی ئێوە بۆ هۆشیاری تەندروستی و زانیاری پزیشکی، ڕای شارەزایان و ئامۆژگارییە تەندروستییەکان."}
+             </p>
           </div>
 
           <div className="space-y-4">

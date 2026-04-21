@@ -54,6 +54,10 @@ export const translations: Translations = {
   sulaymaniyah: { en: 'Sulaymaniyah', ku: 'سلێمانی' },
   duhok: { en: 'Duhok', ku: 'دهۆک' },
   qalladza: { en: 'Qalladza', ku: 'قەڵادزێ' },
+  kirkuk: { en: 'Kirkuk', ku: 'کەرکوک' },
+  kalar: { en: 'Kalar', ku: 'کەلار' },
+  soran: { en: 'Soran', ku: 'سۆران' },
+  zakho: { en: 'Zakho', ku: 'زاخۆ' },
 };
 
 interface LanguageContextType {
