@@ -4,6 +4,7 @@ import { Search, MapPin, Stethoscope, BookOpen, Globe, User, LayoutDashboard, Ch
 import { motion, AnimatePresence } from 'motion/react';
 import Papa from 'papaparse';
 import { SPECIALTIES } from './constants/specialties';
+import { DOCTORS_SEED } from './constants/seedData';
 import { dataService, type Doctor, type Article } from './lib/dataService';
 import { auth, db } from './lib/firebase';
 import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
@@ -145,9 +146,9 @@ function AppContent() {
       if (isAdmin && doctors.length === 0 && articles.length === 0 && !isLoading) {
         console.log("Seeding initial data as admin...");
         try {
-          for (const d of MOCK_DOCTORS) {
-            const { id, ...rest } = d;
-            await dataService.addDoctor(rest);
+          // Import from Seed Data
+          for (const d of DOCTORS_SEED) {
+            await dataService.addDoctor(d);
           }
           for (const a of MOCK_ARTICLES) {
             const { id, ...rest } = a;

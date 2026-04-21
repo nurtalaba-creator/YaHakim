@@ -97,5 +97,47 @@ export const SPECIALTIES: SpecialtyData[] = [
     name_ku: 'دڵ و قەستەرە',
     description_en: 'Heart and vascular healthcare.',
     description_ku: 'پسپۆڕی دڵ و بۆڕیەکانی خوێن.'
+  },
+  {
+    id: 'radiology',
+    name_en: 'Radiology',
+    name_ku: 'تیشک و سۆنار',
+    description_en: 'Medical imaging and diagnostics.',
+    description_ku: 'پسپۆڕی تیشک و سۆنار.'
+  },
+  {
+    id: 'neurosurgery',
+    name_en: 'Neurosurgery',
+    name_ku: 'نەشتەرگەری مێشک و دەمار',
+    description_en: 'Brain and spinal cord surgery.',
+    description_ku: 'نەشتەرگەری مێشک و دەمار و فەقەرات.'
+  },
+  {
+    id: 'rheumatology',
+    name_en: 'Rheumatology',
+    name_ku: 'ڕۆماتیزمە',
+    description_en: 'Joint, muscle, and autoimmune diseases.',
+    description_ku: 'پسپۆڕی ڕۆماتیزمە و جومگەکان.'
+  },
+  {
+    id: 'anesthesia',
+    name_en: 'Anesthesia',
+    name_ku: 'بێهۆشکاری',
+    description_en: 'Anesthesia and pain management.',
+    description_ku: 'پسپۆڕی بێهۆشکاری.'
+  },
+  {
+    id: 'psychiatry',
+    name_en: 'Psychiatry',
+    name_ku: 'دەروونی',
+    description_en: 'Mental health and behavioral disorders.',
+    description_ku: 'پسپۆڕی نەخۆشییە دەروونییەکان.'
+  },
+  {
+    id: 'nutrition',
+    name_en: 'Nutrition',
+    name_ku: 'خۆراک و گەشە',
+    description_en: 'Clinical nutrition and dietetics.',
+    description_ku: 'پسپۆڕی خۆراک و گەشە.'
   }
 ];
