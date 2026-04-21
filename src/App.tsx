@@ -496,6 +496,8 @@ function AppContent() {
                   setIsImporting={setIsImporting}
                   importProgress={importProgress}
                   setImportProgress={setImportProgress}
+                  isAdmin={isAdmin}
+                  user={user}
                 />
               </motion.div>
             )}
@@ -1231,47 +1233,46 @@ function MagazineSection({ articles, activeSpecialty, setActiveSpecialty, setSel
   );
 }
 
-function CMSSection({ setDoctors, setArticles, isImporting, setIsImporting, importProgress, setImportProgress }: { 
+function CMSSection({ setDoctors, setArticles, isImporting, setIsImporting, importProgress, setImportProgress, isAdmin, user }: { 
   setDoctors: React.Dispatch<React.SetStateAction<Doctor[]>>, 
   setArticles: React.Dispatch<React.SetStateAction<Article[]>>,
   isImporting: boolean,
   setIsImporting: React.Dispatch<React.SetStateAction<boolean>>,
   importProgress: number,
-  setImportProgress: React.Dispatch<React.SetStateAction<number>>
+  setImportProgress: React.Dispatch<React.SetStateAction<number>>,
+  isAdmin: boolean,
+  user: FirebaseUser | null
 }) {
   const [activeForm, setActiveForm] = useState<'doctor' | 'article' | 'import'>('import');
-  const [password, setPassword] = useState('');
-  const [isAuthorized, setIsAuthorized] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === 'admin123') { // Simple password for demo
-      setIsAuthorized(true);
-    } else {
-      alert('Incorrect password');
-    }
-  };
-
-  if (!isAuthorized) {
+  if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] p-6">
-        <form onSubmit={handleLogin} className="w-full max-w-sm bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 text-center space-y-6">
-           <div className="w-16 h-16 bg-teal-50 dark:bg-teal-900/20 rounded-full flex items-center justify-center mx-auto">
-              <Lock className="text-teal-600" size={28} />
+      <div className="flex items-center justify-center min-h-[60vh] p-6 text-center">
+        <div className="w-full max-w-sm bg-white dark:bg-slate-900 p-10 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 space-y-6">
+           <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/20 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="text-rose-600" size={28} />
            </div>
            <div className="space-y-2">
-             <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Admin Access</h2>
-             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Please enter your credentials</p>
+             <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Restricted Area</h2>
+             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+               {user ? "Access denied. Your account does not have editor privileges." : "Please sign in with an authorized account to access the portal."}
+             </p>
            </div>
-           <input 
-             type="password" 
-             value={password}
-             onChange={(e) => setPassword(e.target.value)}
-             placeholder="Enter Password" 
-             className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl py-3 px-4 text-sm font-bold focus:ring-1 focus:ring-teal-500 dark:text-white"
-           />
-           <button type="submit" className="w-full btn-dark py-4 text-xs bg-slate-900 dark:bg-white dark:text-slate-900">Unlock Panel</button>
-        </form>
+           {!user && (
+             <button 
+               onClick={() => {
+                 const provider = new GoogleAuthProvider();
+                 signInWithPopup(auth, provider);
+               }}
+               className="w-full btn-dark py-4 text-xs bg-slate-900 dark:bg-white dark:text-slate-900"
+             >
+               Sign In with Google
+             </button>
+           )}
+           {user && (
+             <p className="text-[10px] text-slate-400 font-medium">Logged in as {user.email}</p>
+           )}
+        </div>
       </div>
     );
   }
