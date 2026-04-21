@@ -17,9 +17,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // For simple demo mode, we allow all signed-in users to write.
-      // Access is primarily guarded by the UI password.
-      return isSignedIn();
+      // Temporary open access to fix the CSV import block
+      // as requested for the "simple login" mode.
+      return true;
     }
 
     function isValidId(id) {

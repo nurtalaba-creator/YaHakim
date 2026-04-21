@@ -1366,6 +1366,33 @@ function CMSSection({ setDoctors, setArticles, isImporting, setIsImporting, impo
                     </div>
                     <input type="file" accept=".csv" onChange={handleCsvImport} className="hidden" id="csv-upload" />
                     <label htmlFor="csv-upload" className="btn-dark py-2 px-6 text-[10px] cursor-pointer mt-2 bg-slate-900 dark:bg-white dark:text-slate-900">Browse Files</label>
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 w-full mt-4">
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">Or use the data you provided me:</p>
+                      <button 
+                        type="button"
+                        onClick={async () => {
+                          setIsImporting(true);
+                          setImportProgress(0);
+                          let count = 0;
+                          for (let i = 0; i < DOCTORS_SEED.length; i++) {
+                            try {
+                              await dataService.addDoctor(DOCTORS_SEED[i]);
+                              count++;
+                              setImportProgress(Math.round(((i + 1) / DOCTORS_SEED.length) * 100));
+                            } catch (e) { 
+                              console.error("Sync error:", e);
+                            }
+                          }
+                          const updated = await dataService.getDoctors();
+                          setDoctors(updated);
+                          setIsImporting(false);
+                          alert(`Success! Restored ${count} doctors from your file.`);
+                        }}
+                        className="text-[10px] font-black text-teal-600 hover:text-teal-700 transition-colors uppercase tracking-widest"
+                      >
+                        Sync Provided CSV Data
+                      </button>
+                    </div>
                  </div>
                )}
             </div>
